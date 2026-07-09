@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Product Organizer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+  <link rel="stylesheet" href="/stylesheet.css">
+  </head>
+  
+  <body>  
+        
+    <nav class="navbar navbar-expand-lg bg-body-tertiary mb-5">
+        <div class="container-fluid ">
+            <p class="navbar-brand mb-0 h1">Product Organizer</p>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+            <div class="navbar-nav">
+                <a class="nav-link active" aria-current="page" href="/">Home</a>
+                <a class="nav-link" href="/add_product">Add A Product</a>
+            </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mb-5">
+      <div id="Products info" class=" border rounded-3 p-3 bg-light w-25 mb-3">
+      <p class = "text-muted lh-1">Unique Products Count: <span id="unique-products-count">0</span></p>
+      <p class = "text-muted lh-1">Max Product Price: $<span id="max-product-price">0</span></p>
+      <p class = "text-muted lh-1">Min Product Price: $<span id="min-product-price">0</span></p>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">Products</h2>
+        <a href="/add_product" class="btn btn-primary">+ Add Product</a>
+      </div>
+ 
+      <!-- Card grid -->
+      <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-4 g-4" id="product-grid">
+        <!-- Cards injected here -->
+      </div>
+ 
+    </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+  
+  <script>
+      const API_URL = "/api/products";
+ 
+      // Build a single card column element from a product object.
+      function createCard(product) {
+        const col = document.createElement("div");
+        col.className = "col";
+ 
+        const imgSrc = "https://placehold.co/400x180?text=No+Image"; // Was going to let user upload image but could not fiqure it out in time so I used a placeholder
+        const imgAlt = product.Name        || "Product image";
+        const title  = product.Name        || "Untitled";
+        const desc   = product.Description || "No description available.";
+        const stock  = product.Stock       || 0;
+        const price  = product.Price       != null
+                           ? `<p class="text-start">$${Number(product.Price).toFixed(2)}</p>`
+                           : "";
+ 
+        col.innerHTML = `
+          <div class="card product-card shadow-sm">
+            <img src="${imgSrc}" class="card-img-top" alt="${imgAlt}"
+                 onerror="this.src='https://placehold.co/400x180?text=No+Image'">
+            <div class="card-body d-flex flex-column">
+              <h5 class="card-title">${title}</h5>
+              <p class="card-text text-muted flex-grow-1">${desc}</p>
+              ${price}
+
+              <div class = "row">
+                <div class="col">
+                  <p class="fw-bolder">Stock:</p>
+                </div>
+                <div class="col">
+                  <div class="btn-group" role="group" aria-label="stock controls">
+                    <button type="button" class="btn btn-primary" onclick="changeStock('${title}', -1)">-</button>
+                    <button type="button" class="btn btn-primary active" id = "stock-${title}">${stock}</button>
+                    <button type="button" class="btn btn-primary" onclick="changeStock('${title}', 1)">+</button>
+                  </div>
+                </div>
+              </div> 
+
+              <button class="btn btn-danger mt-3" onclick="deleteProduct('${title}')">Delete</button>
+
+            </div>
+          </div>`;
+ 
+        return col;
+      }
+ 
+      // Main fetch function to load products into the grid 
+      async function loadProducts() {
+ 
+        try {
+          const response = await fetch(API_URL);
+ 
+          if (!response.ok) {
+            throw new Error(`Server returned ${response.status} ${response.statusText}`);
+          }
+ 
+          const products = await response.json();
+ 
+          if (!Array.isArray(products) || products.length === 0) {
+            return;
+          }
+ 
+          const grid = document.getElementById("product-grid");
+          grid.innerHTML = "";                        
+          products.forEach(p => grid.appendChild(createCard(p)));
+          getProductsInfo();
+ 
+        } catch (err) {
+          console.error("Failed to load products:", err);
+        }
+        
+      }
+
+      // Fetch and display products info (unique count, max price, min price)
+      async function getProductsInfo(){
+        const response = await fetch("/api/products_info");
+        const info = await response.json();
+
+        document.getElementById("unique-products-count").textContent = info.unique_products;
+        document.getElementById("max-product-price").textContent = info.max_price.toFixed(2);
+        document.getElementById("min-product-price").textContent = info.min_price.toFixed(2);
+      }
+
+      // Update stock
+      async function changeStock(name, change){
+
+        const response = await fetch(`/api/update_stock/${name}/${change}`);
+
+        try {
+          if (!response.ok) {
+            throw new Error(`Server returned ${response.status} ${response.statusText}`);
+            return;
+          }else  {
+            const stock_amount = document.getElementById(`stock-${name}`);
+            stock_amount.textContent = parseInt(stock_amount.textContent) + change;
+          }
+        } catch (err) {
+          console.error("Failed to update stock:", err);
+        }
+
+      }
+
+      // Simple delete function that calls the API and then reloads the products
+      async function deleteProduct(name){
+        const response = await fetch(`/api/delete_product/${name}`);
+        loadProducts();
+      }
+ 
+      // Run on page load 
+      document.addEventListener("DOMContentLoaded", loadProducts);
+    </script>
+    
+</body>
+</html>
